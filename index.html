@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>landlords</title>
+    <link href="/css/reset.css" rel="stylesheet" media="all">
+    <link href="/css/main.css" rel="stylesheet" media="all">
+</head>
+<body>
+
+<div class="left" id="left"></div>
+<div class="center" id="center"></div>
+
+<div class="grab" id="grab_content">
+    <a class="start-grab" href="javascript:;" id="start_grab">抢地主</a>
+    <span class="time" id="time_left"></span>
+    <a class="donot-grab" href="javascript:;" id="donot_grab">不抢</a>
+</div>
+
+<div class="grab" id="throw">
+    <a class="start-grab" href="javascript:;" id="throw_out">出牌</a>
+    <span class="time margin5" id="throw_time_left"></span>
+    <a class="donot-grab" href="javascript:;" id="donot_throw">不出</a>
+</div>
+
+<div class="top" id="top"></div>
+<div class="right" id="right"></div>
+<div class="cards-throwed" id="cards_throwed_content"></div>
+<div class="cards-prev-throwed" id="cards_prev_throwed_content"></div>
+<div class="cards-next-throwed" id="cards_next_throwed_content"></div>
+<div class="bottom" id="user_cards"></div>
+<div class="thumb" id="thumb">
+    <img />
+</div>
+
+<div class="thumb-right" id="thumb_right">
+    <img />
+</div>
+
+<div class="thumb-left" id="thumb_left">
+    <img />
+</div>
+
+<div class="other-grab" id="other_grab">20</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/js/jquery-1.11.0.js"></script>
+<script src="/js/main.js"></script>
+</body>
+</html>
