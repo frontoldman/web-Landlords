@@ -148,7 +148,6 @@
             var cardsThrowed = analysisUserPorker(cardIds);
             renderMyUI(cardsThrowedContent,cardsThrowed);
             cardsThrowedContent.show();
-
             cardsChoose.length = 1;
             cardIds.length = 1;
         });
