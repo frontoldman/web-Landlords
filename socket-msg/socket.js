@@ -4,18 +4,16 @@
 var poker = require('../model/poker')
     , _ = require('lodash');
 
-//用户列表
-var userList = {};
-//桌子列表
-var desks = [];
 
-module.exports = function (socket) {
+
+module.exports = function (socket,userList,desks) {
 
     var session = socket.handshake.session,
+        identity,
         indexInDesk,
         indexOfDesk;//此人在多少桌
 
-    socket.emit('room-in', session.user);
+
 
     if (userList[session.user]) {
         return;
@@ -64,6 +62,7 @@ module.exports = function (socket) {
     }
 
 
+
     var deskPrepare = desks[indexOfDesk],//等待开局的桌子
         personPrepare = true;//是否满员需要开局
 
@@ -77,6 +76,8 @@ module.exports = function (socket) {
     } else {
         personPrepare = false;
     }
+
+    socket.emit('room-in', session.user);
 
     var pokerDB ,//总的牌数组
         userPorkers,//每个用户的牌
@@ -274,38 +275,56 @@ module.exports = function (socket) {
                 status = 1;
                 break;
             case 1:
-                if (current < land) {//搭档
+                if (current < land) {
                     status = 2;
                 } else {
-                    status = 3;//农民
+                    status = 3;
                 }
                 break;
             case 2:
                 if (current < land) {
-                    status = 3;//农民
+                    status = 3;
                 } else {
-                    status = 2;//搭档
+                    status = 2;
                 }
                 break;
         }
         return status;
     }
 
+    socket.on('save-status',function(status){
+        identity = status;
+    })
+
     socket.on('throw-card', function (cardIds, cardsChoose, complyRules, myPorkers) {
         var desk = desks[indexOfDesk],
             prevIndex = indexInDesk === 0 ? 2 : indexInDesk - 1 ,
             nextIndex = (indexInDesk + 1) % 3;
 
+        //剩下的牌
+        if(cardIds){
+            desk[indexInDesk].porkers = myPorkers;
+            if(myPorkers.length === 0){
+                socket.emit('game-over-' + session.user,1);
+                if(identity === 1){
+                    socket.broadcast.emit('game-over-' + desk[nextIndex].user,0);
+                    socket.broadcast.emit('game-over-' + desk[prevIndex].user,0);
+                }else if(identity === 2){
+                    socket.broadcast.emit('game-over-' + desk[nextIndex].user,0);
+                    socket.broadcast.emit('game-over-' + desk[prevIndex].user,1);
+                }else{
+                    socket.broadcast.emit('game-over-' + desk[nextIndex].user,1);
+                    socket.broadcast.emit('game-over-' + desk[prevIndex].user,0);
+                }
 
-        console.log(myPorkers);
-
-        desk[indexInDesk].porkers = myPorkers;
-        socket.emit('after-throw',time);
-
+            }
+        }
+       // console.log(cardIds);
+        socket.emit('after-throw',time,cardIds);
         //触发下一家出牌
-        socket.broadcast.emit('throwing-' + desk[nextIndex].user,cardIds,cardsChoose,complyRules,time);
-
-        socket.broadcast.emit('waiting-for-throwing-' + desk[prevIndex].user,cardIds,cardsChoose,complyRules,time);
+        socket.broadcast.emit('throwing-' + desk[nextIndex].user,time,cardIds,cardsChoose,complyRules);
+        //触发上家等待
+        socket.broadcast.emit('waiting-for-throwing-' + desk[prevIndex].user,time,cardIds,cardsChoose,complyRules);
 
     });
 

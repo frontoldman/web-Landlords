@@ -7,12 +7,15 @@
 //27-39 黑桃
 //40-52 方块
 //53 54 小鬼 大鬼
-    var socket = io.connect('http://localhost');
+    var socket = io.connect('http://web-landlords.ap01.aws.af.cm/');
+
+    window.socket = socket;
 
     var color = ['hearts', 'plum-flower', 'spades', 'square-piece'],
         myPorkers,
         userCards = {},
         prevCardsSend = [],
+        identity,
         waitInter,
         grabInter,
         throwInter,
@@ -25,7 +28,8 @@
     }
 
     //上家的牌
-    var prevCrads ;
+    var prevCrads = null ,
+        mustThrow = 0;
 
     var cardsChoose = [],
         cardIds = [];
@@ -33,6 +37,7 @@
     socket.on('room-in', function (username) {
 
         socket.on('init-poker-' + username, function (userPorker) {
+            $('#waiting_msg').hide();
             myPorkers = userPorker;
             userCards = analysisUserPorker(userPorker);
             renderUI();
@@ -69,6 +74,7 @@
 
         socket.on('start-play-' + username,function(relative,time){
             var status = relative[0],
+                name = '',
                 thumb = $('#thumb'),
                 img = thumb.find('img'),
                 thumb_right = $('#thumb_right'),
@@ -86,11 +92,9 @@
             thumb_left.show();
 
 
-            //console.log(landlordCards);
 
             switch(status){
                 case 1://地主
-                    console.log('地主');
                     img.attr('src',thumb_img.landlord);
                     thumb_right_img.attr('src',thumb_img.framer);
                     thumb_left_img.attr('src',thumb_img.partner);
@@ -99,24 +103,31 @@
                     userCards = analysisUserPorker(allCards);
                     renderMyUI($('#user_cards'),userCards);
                     showThrow(time);
+                    cardsChoose.length = 0;
+                    cardIds.length = 0;
+                    name = '地主';
                     break;
-                case 2:
-                    console.log('搭档');
+                case 2://搭档
                     img.attr('src',thumb_img.partner);
                     thumb_right_img.attr('src',thumb_img.landlord);
                     renderPreNext(20,$('#right'));
                     thumb_left_img.attr('src',thumb_img.framer);
                     showOtherThrow(time,'next');
+                    name = '搭档';
                     break;
-                case 3:
-                    console.log('农民');
+                case 3://农民
                     img.attr('src',thumb_img.framer);
                     thumb_right_img.attr('src',thumb_img.partner);
                     thumb_left_img.attr('src',thumb_img.landlord);
                     renderPreNext(20,$('#left'));
                     showOtherThrow(time,'prev');
+                    name = '农民';
                     break;
             }
+
+            //出完牌需要把身份发给服务器端
+            socket.emit('save-status',status);
+            identity = name;
 
             var landlordCardsColor = analysisUserPorker(landlordCards);
             var top = $('#top'),
@@ -136,46 +147,104 @@
             }
         });
 
-        //监听出牌之后的事件
-        socket.on('after-throw',function(time){
-            var cardsThrowedContent = $('#cards_throwed_content')
+        //胜利事件
+        socket.on('game-over-' + username,function(isVictory){
 
+            var slogan = '';
+            if(isVictory === 1){
+                slogan = '胜利了！'
+            }else{
+                slogan = '失败了！'
+            }
+
+            alert(identity + ':' + slogan);
+
+        })
+
+        //我出完牌
+        socket.on('after-throw',function(time,cardIds){
+
+            var cardsThrowedContent = $('#cards_throwed_content')
+            $('#cards_next_throwed_content').hide();
             showOtherThrow(time,'next');
             $('#throw').hide();
             clearInterval(throwInter);
-            userCards = analysisUserPorker(myPorkers);
-            renderMyUI($('#user_cards'),userCards);
-            var cardsThrowed = analysisUserPorker(cardIds);
-            renderMyUI(cardsThrowedContent,cardsThrowed);
             cardsThrowedContent.show();
-            cardsChoose.length = 1;
-            cardIds.length = 1;
+            if(cardIds){
+                userCards = analysisUserPorker(myPorkers);
+                renderMyUI($('#user_cards'),userCards);
+
+                var cardsThrowed = analysisUserPorker(cardIds);
+                renderMyUI(cardsThrowedContent,cardsThrowed);
+
+                prevCrads = null;
+                mustThrow = 0;
+                cardsChoose.length = 0;
+
+            }else{
+
+                cardsThrowedContent.css({
+                    left:($(window).width() - cardsThrowedContent.width())/2 + 'px'
+                })
+                cardsThrowedContent.html('<strong class="notice">不出</strong>');
+            }
+
         });
 
-        //监听出牌事件
-        socket.on('throwing-' + username,function(cardIds,cardsChoose,complyRules,time){
-            var other_grab = $('#other_grab');
+        //上家出完牌
+        socket.on('throwing-' + username,function(time,cardIds,cardsChoose,complyRules){
+            var other_grab = $('#other_grab'),
+                prevContent = $('#cards_prev_throwed_content');
+            $('#cards_throwed_content').hide();
             showThrow(time);
             clearInterval(otherThrowInter);
             other_grab.hide();
-            showCardsPrev(cardIds);
+            prevContent.show();
+            if(cardIds){
+                showCardsPrev(cardIds);
+                mustThrow = 0;
+            }else{
+                mustThrow++;
+                prevContent.html('<strong class="notice-left">不出</strong>');
+            }
+
+            if(complyRules){
+                prevCrads = complyRules;
+            }
+
         });
 
-        //监听上家出牌的事件
-        socket.on('waiting-for-throwing-' + username,function(cardIds,cardsChoose,complyRules,time){
+        //下家出完牌
+        socket.on('waiting-for-throwing-' + username,function(time,cardIds,cardsChoose,complyRules){
+            var nextContent = $('#cards_next_throwed_content');
             clearInterval(otherThrowInter);
             showOtherThrow(time,'prev');
-            showCardsNext(cardIds);
+            nextContent.show();
+            if(cardIds){
+                showCardsNext(cardIds);
+                mustThrow = 0;
+            }else{
+                mustThrow++;
+                nextContent.html('<strong class="notice-right">不出</strong>');
+            }
+
+            $('#cards_prev_throwed_content').html('').hide();
+            prevCrads = complyRules;
         });
-
-
 
         //别人逃跑
         socket.on('somebody-run-away-' + username,function(runawayUser){
-           // alert(runawayUser + '逃跑了,系统将补偿你10000000000000亿美金！！！');
+            // alert(runawayUser + '逃跑了,系统将补偿你10000000000000亿美金！！！');
             initBack();
         });
     })
+
+
+    $('#enter_in a').on('click',function(){
+        $('#enter_in').hide();
+
+    })
+
 
 //renderUI
     function renderUI() {
@@ -403,10 +472,14 @@
             //时间到，不出牌
             if (time <= 0) {
                 clearInterval(throwInter);
-                //  $throw.hide();
-                //  socket.emit('throw-cards', false);
+                if(mustThrow === 2){
+                    alert('您必须出牌！！');
+                    return;
+                }
+                $throw.hide();
+                socket.emit('throw-card', false);
             }
-            timeContent.html(time)
+            timeContent.html(time);
         }, 1000);
 
     }
@@ -443,8 +516,8 @@
     function showCardsPrev(cardIds){
         var cards_prev_throwed_content = $('#cards_prev_throwed_content');
         cards_prev_throwed_content.html('');
-        var prevCrads = analysisUserPorker(cardIds);
-        renderMyUI(cards_prev_throwed_content,prevCrads,true);
+        var _prevCrads = analysisUserPorker(cardIds);
+        renderMyUI(cards_prev_throwed_content,_prevCrads,true);
         cards_prev_throwed_content.show();
     }
 
@@ -452,8 +525,8 @@
     function showCardsNext(cardIds){
         var cards_next_throwed_content = $('#cards_next_throwed_content');
         cards_next_throwed_content.html('');
-        var nextCrads = analysisUserPorker(cardIds);
-        renderMyUI(cards_next_throwed_content,nextCrads,true);
+        var _nextCrads = analysisUserPorker(cardIds);
+        renderMyUI(cards_next_throwed_content,_nextCrads,true);
         cards_next_throwed_content.show();
     }
 
@@ -462,10 +535,15 @@
         clearInterval(grabInter);
         clearInterval(throwInter);
         clearInterval(otherThrowInter);
+        $('#left').html('');
+        $('#user_cards').html('');
+        $('#right').html('');
+        $('#top').html('');
         $('#thumb_left').hide();
         $('#thumb_right').hide();
         $('#thumb').hide();
-
+        $('#other_grab').html('');
+        $('#throw').hide();
     }
 
 //绑定事件
@@ -550,26 +628,61 @@
     $throw_out.on('click',function(){
         var complyRules = checkCardsRule();
 
-        console.log(complyRules);
         if(!complyRules){
             alert('您的牌不符合规则');
             return;
         }
 
-        getIds();
+
         if(prevCrads){
+            //上一家是王炸
+            if(/wongFried/.test(prevCrads.name)){
+                alert('你的牌没有大于上家');
+                return;
+            }
+
+            if(/wongFried/.test(complyRules.name)){
+                success();
+            }else if(/bomb/.test(complyRules.name) && !/bomb/.test(prevCrads.name)){
+                success();
+            }else{
+                var isBigger = rulesCompare[prevCrads.name](complyRules,prevCrads);
+                if(isBigger){
+                    success();
+                }else{
+                    alert('你的牌没有大于上家');
+                }
+            }
 
         }else{
+            success()
+        }
+
+        function success(){
+            getIds();
             difference(myPorkers,cardIds);
             socket.emit('throw-card',cardIds,cardsChoose,complyRules,myPorkers);
         }
+    });
 
+    $donot_throw.on('click',function(){
+        if(mustThrow === 2){
+            alert('您必需出牌！！！');
+            return;
+        }
+
+        var $throw = $('#throw');
+        clearInterval(throwInter);
+        $throw.hide();
+
+        socket.emit('throw-card', false);
     });
 
     //取得牌id集合
     function getIds(){
+        cardIds.length = 0;
         for(var i = 0;i<cardsChoose.length;i++){
-            cardIds.push(cardsChoose[0].id);
+            cardIds.push(cardsChoose[i].id);
         }
     }
 
@@ -578,6 +691,7 @@
             childrenObj = {},
             newContent = [];
 
+       // console.log(children);
         content.forEach(function(val){
             contentObj[val] = true;
         });
@@ -586,6 +700,7 @@
             childrenObj[val] = true;
         });
 
+       // console.log(childrenObj)
         for(var i in childrenObj){
             delete contentObj[i];
         }
@@ -609,7 +724,6 @@
     }
 
     var rules = {
-        //一对
         one:function(){
             var length = cardsChoose.length,
                 card ,
@@ -624,56 +738,58 @@
             return false;
         },
         pairs:function(){
-            var length = cardsChoose.length;
+            var length = cardsChoose.length,
+                result = {};
             if(length==2&&cardsChoose[0].card === cardsChoose[1].card){
-                return true;
+                result.name = 'pairs';
+                result.card = cardsChoose[0].card;
+                return result;
             }
             return false;
         },
         three:function(){
-            var length = cardsChoose.length;
+            var length = cardsChoose.length,
+                result = {};
             if(length == 3
                 && cardsChoose[0].card === cardsChoose[1].card
                 && cardsChoose[1].card === cardsChoose[2].card){
-                return true;
+                result.name = 'three';
+                result.card = cardsChoose[0].card;
+                return result;
             }
             return false;
         },
         threeWithOne:function(){
-            var length = cardsChoose.length;
+            var length = cardsChoose.length,
+                result = {};
             if(length == 4 ){
                 if((cardsChoose[0].card === cardsChoose[1].card && cardsChoose[1].card === cardsChoose[2].card)
                     || (cardsChoose[1].card === cardsChoose[2].card && cardsChoose[2].card === cardsChoose[3].card)){
-                    return true;
+                    result.name = 'threeWithOne';
+                    result.card = cardsChoose[1].card;
+                    return result;
                 }
             }
             return false;
         },
         threeWithPairs:function(){
-            var length = cardsChoose.length;
+            var length = cardsChoose.length,
+                result = {};
             if(length == 5 ){
                 if((cardsChoose[0].card === cardsChoose[1].card && cardsChoose[1].card === cardsChoose[2].card
                     && cardsChoose[3].card === cardsChoose[4].card)
                     || (cardsChoose[2].card === cardsChoose[3].card && cardsChoose[3].card === cardsChoose[4].card
                     && cardsChoose[0].card === cardsChoose[1].card)){
-                    return true;
-                }
-            }
-            return false;
-        },
-        four:function(){
-            var length = cardsChoose.length;
-            if(length == 4 ){
-                if(cardsChoose[0].card === cardsChoose[1].card
-                    && cardsChoose[0].card === cardsChoose[2].card
-                    && cardsChoose[0].card === cardsChoose[3].card){
-                    return true;
+                    result.name = 'threeWithPairs';
+                    result.card = cardsChoose[2].card;
+                    return result;
                 }
             }
             return false;
         },
         fourWithTwo:function(){
             var length = cardsChoose.length,
+                result = {},
                 uniques = {},
                 card;
             if(length == 6 ){
@@ -682,7 +798,9 @@
                     if(uniques[card]){
                         uniques[card] ++;
                         if(uniques[card] === 4){
-                            return true;
+                            result.name = 'fourWithTwo';
+                            result.card = card;
+                            return result;
                         }
                     }else{
                         uniques[card] = 1;
@@ -695,7 +813,9 @@
         fourWithPairs:function(){
             var length = cardsChoose.length,
                 uniques = {},
+                result = {},
                 threeObj = {},
+                fourCard,
                 card;
 
             if(length == 8 ){
@@ -711,6 +831,7 @@
 
             for(var i in uniques){
                 if(uniques[i] === 4){
+                    fourCard = i;
                     threeObj[4] = true;
                 }else if(uniques[i] === 2){
                     if(threeObj[2]){
@@ -722,13 +843,16 @@
             }
 
             if(threeObj[4] && threeObj[2] === 2){
-                return true;
+                result.name = 'fourWithPairs';
+                result.card = fourCard;
+                return result;
             }
 
             return false;
         },
         junko:function(){
             var length = cardsChoose.length,
+                result = {},
                 current ;
             if(length>=5){
                 for(var i = 0;i<length;i++){
@@ -737,7 +861,7 @@
                         return false;
                     }
                     //有2返回false;
-                    if(cardsChoose[i].card == 2){
+                    if(cardsChoose[i].card == 16){
                         return false;
                     }
                     if(!current){
@@ -749,13 +873,17 @@
                         current = cardsChoose[i].card * 1 ;
                     }
                 }
-                return true;
+                result.name = 'junko';
+                result.max = cardsChoose[0].card * 1;
+                result.length = length;
+                return result;
             }else{
                 return false;
             }
         },
         company:function(){
-            var length = cardsChoose.length;
+            var length = cardsChoose.length,
+                result = {};
             if(length >= 6 && length%2 === 0){
                 for(var i = 0;i<length;i+=2){
                     if(cardsChoose[i].card != cardsChoose[i+1].card ){
@@ -767,19 +895,24 @@
                         }
                     }
                 }
-                return true;
+                result.name = 'company';
+                result.length = length;
+                result.max = cardsChoose[0].card * 1;
+
+                return result;
             }
             return false;
         },
         aircraft:function(){
             var length = cardsChoose.length,
+                result = {},
                 card,
                 threeObj = [],
                 oneObj = [],
                 twoObj = [],
                 uniques = {};
 
-            if( length>5 && (length%4 ===0 || length%5 ===0) ){
+            if( length>5 && (length%4 ===0 || length%5 ===0 || length%3 ===0) ){
                 for(var i = 0;i<length;i++){
                     for(var i = 0;i<length;i++){
                         card = cardsChoose[i].card;
@@ -805,14 +938,21 @@
                     }
                 }
 
+                console.log(uniques);
+                console.log(threeObj);
+                console.log(twoObj);
+                console.log(oneObj);
+
                 var currentOneOfThree;
 
                 if(threeObj.length>=2){
 
-                    if(twoObj.length && oneObj.length){
-                        return false;
-                    }
-
+//                    if(twoObj.length && oneObj.length){
+//                        return false;
+//                    }
+                    threeObj.sort(function(a,b){
+                        return b*1 - a*1;
+                    })
                     for(var i = 0;i<threeObj.length;i++){
                         if(!currentOneOfThree){
                             currentOneOfThree = threeObj[i]*1;
@@ -825,45 +965,118 @@
                     }
 
                     if(!twoObj.length && !oneObj.length){
-                        return true;
+                        result.name = 'aircraft';
+                        result.max = threeObj[0] * 1;
+                        result.length = length;
+                        return result;
                     }
 
                     if(twoObj.length>0 && twoObj.length != threeObj.length){
                         return false;
                     }
 
-                    if(oneObj.length>0 && oneObj.length != threeObj.length){
-                        return false;
+
+
+                    if(length === threeObj.length*4){
+                        result.name = 'aircraft';
+                        result.max = threeObj[0] * 1;
+                        result.length = length;
+                        return result;
+                    }
+
+                    if(length === threeObj.length*5 && twoObj.length === threeObj.length ){
+                        result.name = 'aircraft';
+                        result.max = threeObj[0] * 1;
+                        result.length = length;
+                        return result;
                     }
 
                 }
 
-                return true;
             }
             return false;
         },
         bomb:function(){
-            var length = cardsChoose.length;
+            var length = cardsChoose.length,
+                result = {};
             if(length === 4){
                 if(cardsChoose[0].card === cardsChoose[1].card
                     && cardsChoose[0].card === cardsChoose[2].card
                     && cardsChoose[0].card === cardsChoose[3].card){
-                    return true;
+                    result.name = 'bomb';
+                    result.card = cardsChoose[0].card*1;
+                    return result;
                 }
             }
             return false;
         },
         wongFried:function(){
             var length = cardsChoose.length,
+                result = {},
                 reg = /53|54/;
             if(length === 2){
                 if(reg.test(cardsChoose[0].card) && reg.test(cardsChoose[1].card)){
-                    return true;
+                    result.name = 'wongFried';
+                    return result;
                 }
             }
             return false;
         }
 
 
+    }
+
+    var rulesCompare = {
+        one:function(current,prev){
+            if(current.name === prev.name){
+                if(current.card*1 > prev.card*1){
+                    return true;
+                }
+            }
+            return false;
+        },
+        pairs:function(current,prev){
+            return this.one(current,prev);
+        },
+        three:function(current,prev){
+            return this.one(current,prev);
+        },
+        threeWithOne:function(current,prev){
+            return this.one(current,prev);
+        },
+        threeWithPairs:function(current,prev){
+            return this.one(current,prev);
+        },
+        fourWithTwo:function(current,prev){
+            return this.one(current,prev);
+        },
+        fourWithPairs:function(current,prev){
+            return this.one(current,prev);
+        },
+        junko:function(current,prev){
+            if(current.name === prev.name){
+                if(current.length === prev.length){
+                    if(current.max > prev.max){
+                        return true;
+                    }
+                    return false;
+                }
+                return false;
+            }
+            return false;
+        },
+        company:function(current,prev){
+            return this.junko(current,prev);
+        },
+        aircraft:function(current,prev){
+            return this.junko(current,prev);
+        },
+        bomb:function(current,prev){
+            return this.one(current,prev);
+        }
+    }
+
+    window.onbeforeunload = function(){
+        return '请不要离开！！！';
     }
 })();

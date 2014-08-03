@@ -135,7 +135,7 @@ body{
     height:150px;
     display: none;
 }
-.cards-prev-throwed img,.cards-next-throwe img{
+.cards-prev-throwed img,.cards-next-throwed img{
     position: absolute;
     display: block;
     height: 140px;
@@ -146,4 +146,41 @@ body{
     right:140px;
     height:150px;
     display: none;
+}
+.notice-left,.notice-right,.notice{
+    position: absolute;
+    font-size: 30px;
+    font-weight: bold;
+    color: #802126;
+    white-space: nowrap;
+}
+.notice-left{
+    left:10px;
+}
+.notice-right{
+    right: 10px;
+}
+.notice{
+    bottom: 30px;
+}
+.enter-in{
+    width: 500px;
+    margin:100px auto;
+    text-align: center;
+    display: none;
+}
+.enter-in .prepare{
+    display: inline-block;
+    background-color: #802126;
+    color: #fff;
+    font-weight: bold;
+    padding: 5px 20px;
+    text-decoration: none;
+    border-radius: 5px;
+}
+.waiting-msg{
+    font-size: 30px;
+    text-align: center;
+    margin-top: 100px;
+    color: #802126;
 }

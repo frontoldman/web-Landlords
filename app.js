@@ -20,10 +20,17 @@ app.use(express.cookieSession({
     secret: 'zr'
 }));
 
-
+//用户列表
+var userList = {};
+//桌子列表
+var desks = [];
 
 app.get('/landlords', function (req, res) {
-    req.session.user = Math.random();
+    if(userList[req.ip]){
+        res.send('禁止多开');
+        return;
+    }
+    req.session.user = req.ip;
     res.sendfile(__dirname + '/index.html');
 });
 
@@ -43,7 +50,11 @@ io.set('authorization', function(handshakeData, callback){
     }
 });
 
-io.sockets.on('connection', mySocket);
+
+
+io.sockets.on('connection', function(socket){
+    mySocket(socket,userList,desks);
+});
 
 
 

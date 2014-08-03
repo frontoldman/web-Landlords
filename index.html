@@ -11,15 +11,15 @@
 <div class="center" id="center"></div>
 
 <div class="grab" id="grab_content">
-    <a class="start-grab" href="javascript:;" id="start_grab">抢地主</a>
-    <span class="time" id="time_left"></span>
     <a class="donot-grab" href="javascript:;" id="donot_grab">不抢</a>
+    <span class="time" id="time_left"></span>
+    <a class="start-grab" href="javascript:;" id="start_grab">抢地主</a>
 </div>
 
 <div class="grab" id="throw">
-    <a class="start-grab" href="javascript:;" id="throw_out">出牌</a>
-    <span class="time margin5" id="throw_time_left"></span>
     <a class="donot-grab" href="javascript:;" id="donot_throw">不出</a>
+    <span class="time margin5" id="throw_time_left"></span>
+    <a class="start-grab" href="javascript:;" id="throw_out">出牌</a>
 </div>
 
 <div class="top" id="top"></div>
@@ -42,6 +42,10 @@
 
 <div class="other-grab" id="other_grab">20</div>
 
+<div class="enter-in" id="enter_in">
+    <a href="javascript:;" class="prepare" id="prepare">点击准备开始斗地主吧</a>
+</div>
+<div class="waiting-msg" id="waiting_msg">人员满桌自动开局！</div>
 <script src="/socket.io/socket.io.js"></script>
 <script src="/js/jquery-1.11.0.js"></script>
 <script src="/js/main.js"></script>
